@@ -1,0 +1,13 @@
+#! /bin/sh
+
+case $1 in
+    start)
+	/usr/bin/rkwifibt.sh
+	;;
+    stop)
+	echo "skip rmmod ws73 all modules"
+        ;;
+    *)
+        echo "Usage: $0 {start|stop}"
+        ;;
+esac

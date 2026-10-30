@@ -9,7 +9,8 @@ start() {
 }
 
 stop() {
-	find /lib/modules/$(uname -r)/kernel/ -name "*.ko" | xargs -I {} sh -c 'modprobe -r $(basename {})'
+#	find /lib/modules/$(uname -r)/kernel/ -name "*.ko" | xargs -I {} sh -c 'modprobe -r $(basename {})'
+	echo "skip rmmmod *.ko"
 }
 
 case "$1" in
