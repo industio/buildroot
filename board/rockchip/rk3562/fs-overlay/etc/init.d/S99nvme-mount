@@ -1,0 +1,35 @@
+#!/bin/sh
+
+MOUNT_POINT="/mnt/m2"
+DEVICE="/dev/nvme0n1p1"
+
+start() {
+        if [ ! -d ${MOUNT_POINT} ];then
+		mkdir -p ${MOUNT_POINT}
+	fi
+	/usr/bin/mount -o relatime $DEVICE $MOUNT_POINT
+}
+
+stop() {
+	/usr/bin/umount $DEVICE
+	rm -rf $MOUNT_POINT
+}
+
+case "$1" in
+    start)
+        start
+        ;;
+    stop)
+        stop
+        ;;
+    restart|reload)
+        stop 
+        start 
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac
+
+exit 0

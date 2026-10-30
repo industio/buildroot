@@ -4,8 +4,8 @@
 #
 ################################################################################
 
-ANDROID_ADBD_VERSION = 10.0.0+r36-10
-ANDROID_ADBD_FULL_VERSION = 1%25$(ANDROID_ADBD_VERSION)
+ANDROID_ADBD_VERSION = 8.1.0+r23-8
+ANDROID_ADBD_FULL_VERSION = 1%$(ANDROID_ADBD_VERSION)
 ANDROID_ADBD_SITE = https://salsa.debian.org/android-tools-team/android-platform-system-core/-/archive/debian/$(ANDROID_ADBD_FULL_VERSION)
 ANDROID_ADBD_SOURCE = android-platform-system-core-debian-$(ANDROID_ADBD_FULL_VERSION).tar.gz
 ANDROID_ADBD_LICENSE = Apache-2.0

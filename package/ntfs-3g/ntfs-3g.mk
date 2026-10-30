@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-NTFS_3G_VERSION = 2022.10.3
+NTFS_3G_VERSION = 2022.5.17
 NTFS_3G_SOURCE = ntfs-3g_ntfsprogs-$(NTFS_3G_VERSION).tgz
 NTFS_3G_SITE = http://tuxera.com/opensource
 NTFS_3G_CONF_OPTS = --disable-ldconfig
@@ -14,7 +14,6 @@ NTFS_3G_LICENSE = GPL-2.0+, LGPL-2.0+
 NTFS_3G_LICENSE_FILES = COPYING COPYING.LIB
 NTFS_3G_CPE_ID_VENDOR = tuxera
 
-# Fix wrong host install dir
 HOST_NTFS_3G_CONF_OPTS += --prefix=/ --disable-ldconfig
 HOST_NTFS_3G_INSTALL_OPTS += DESTDIR=$(HOST_DIR) install
 

@@ -1,0 +1,15 @@
+KERNEL!="mmcblk[1-9]p[1-9]", GOTO="sdcard_end"
+SUBSYSTEM!="block", GOTO="sdcard_end"
+ENV{DEVTYPE}!="partition", GOTO="sdcard_end"
+
+IMPORT{program}="/sbin/blkid -o udev -p %N"
+
+ENV{ID_FS_TYPE}=="", GOTO="sdcard_end"
+
+ENV{ID_FS_LABEL}!="", ENV{label_uuid_name}="%E{ID_FS_LABEL}"
+ENV{ID_FS_LABEL}=="", ENV{label_uuid_name}="%E{ID_FS_UUID}"
+
+ACTION=="add", RUN+="/usr/sbin/sdcard-hotplug.sh add %k %E{label_uuid_name}"
+ACTION=="remove", RUN+="/usr/sbin/sdcard-hotplug.sh remove %k %E{label_uuid_name}"
+
+LABEL="sdcard_end"

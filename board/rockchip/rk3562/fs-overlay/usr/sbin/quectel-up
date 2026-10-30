@@ -1,0 +1,12 @@
+#!/bin/sh
+QUECTEL_RUNNING=0
+while true
+do
+        if [ -e /dev/ttyUSB0 -a $QUECTEL_RUNNING == 0 ]; then
+                killall quectel-CM
+                sleep 3
+                quectel-CM &
+                QUECTEL_RUNNING=1
+        fi
+        sleep 3
+done

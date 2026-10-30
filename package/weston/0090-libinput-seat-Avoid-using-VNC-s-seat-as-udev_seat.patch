@@ -1,7 +1,7 @@
-From 76fed644f4f4e42558998c5b9795656c66a0dbb8 Mon Sep 17 00:00:00 2001
+From 465e7277aa3ba33bc81ba69dc5389aad45479e2b Mon Sep 17 00:00:00 2001
 From: Jeffy Chen <jeffy.chen@rock-chips.com>
 Date: Wed, 10 Jul 2024 16:45:54 +0800
-Subject: [PATCH 090/100] libinput-seat: Avoid using VNC's seat as udev_seat.
+Subject: [PATCH 90/97] libinput-seat: Avoid using VNC's seat as udev_seat.
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 ---

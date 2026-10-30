@@ -57,9 +57,6 @@ menu "LVGL configuration"
 		config BR2_LV_USE_RTTHREAD_MALLOC
 			bool "RTThread functions malloc/realloc/free"
 
-		config BR2_LV_USE_MIMALLOC_MALLOC
-			bool "Mimalloc functions mi_malloc/mi_realloc/mi_free"
-
 		config BR2_LV_USE_CUSTOM_MALLOC
 			bool "Implement the functions externally"
 
@@ -71,7 +68,6 @@ menu "LVGL configuration"
 			default 1 if BR2_LV_USE_CLIB_MALLOC
 			default 2 if BR2_LV_USE_MICROPYTHON_MALLOC
 			default 3 if BR2_LV_USE_RTTHREAD_MALLOC
-			default 4 if BR2_LV_USE_MIMALLOC_MALLOC
 			default 255 if BR2_LV_USE_CUSTOM_MALLOC
 
 		choice
@@ -234,41 +230,6 @@ menu "LVGL configuration"
 			depends on BR2_LV_USE_DRAW_SW
 			help
 				Disabling this allows arm2d to work on its own (for testing only)
-
-		config BR2_LV_USE_DRAW_RK_TRANSFORM
-			bool "Enable RK transform"
-			default n
-			depends on BR2_LV_USE_DRAW_SW
-			help
-				Enable rk transform.
-
-		config BR2_LV_DRAW_RK_TRANSFORM_SCALER_CORES
-			int "RK transform scaler cores"
-			default -1
-			depends on BR2_LV_USE_DRAW_RK_TRANSFORM
-			help
-				RK transform scaler cores.
-
-		choice BR2_LV_DRAW_RK_TRANSFORM_SCALER_METHOD
-			prompt "RK transform scaler method"
-			default BR2_LV_DRAW_RK_TRANSFORM_SCALER_METHOD_NEAREST
-			depends on BR2_LV_USE_DRAW_RK_TRANSFORM
-			help
-				RK transform scaler method.
-
-			config BR2_LV_DRAW_RK_TRANSFORM_SCALER_METHOD_NEAREST
-				bool "nearest"
-			config BR2_LV_DRAW_RK_TRANSFORM_SCALER_METHOD_BILINEAR
-				bool "bilinear"
-		endchoice
-
-		config BR2_LV_DRAW_RK_TRANSFORM_SCALER_METHOD
-			int
-			default 0 if BR2_LV_DRAW_RK_TRANSFORM_SCALER_METHOD_NEAREST
-			default 1 if BR2_LV_DRAW_RK_TRANSFORM_SCALER_METHOD_BILINEAR
-			depends on BR2_LV_USE_DRAW_RK_TRANSFORM
-			help
-				RK transform scaler method.
 
 		config BR2_LV_DRAW_SW_COMPLEX
 			bool "Enable complex draw engine"

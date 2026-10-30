@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-EFL_VERSION = 1.26.3
+EFL_VERSION = 1.26.1
 EFL_SOURCE = efl-$(EFL_VERSION).tar.xz
 EFL_SITE = https://download.enlightenment.org/rel/libs/efl
 EFL_LICENSE = BSD-2-Clause, LGPL-2.1+, GPL-2.0+, FTL, MIT
@@ -199,7 +199,7 @@ endif
 
 ifeq ($(BR2_PACKAGE_EFL_DRM),y)
 EFL_CONF_OPTS += -Ddrm=true
-EFL_DEPENDENCIES += libdrm libegl mesa3d
+EFL_DEPENDENCIES += libdrm libegl libgbm
 else
 EFL_CONF_OPTS += -Ddrm=false
 endif

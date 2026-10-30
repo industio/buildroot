@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# Start quectel
+#
+start() {
+        start-stop-daemon -S -b -q -p /var/run/quectelcm.pid \
+                -x /usr/sbin/quectel-up
+}
+
+stop() {
+        start-stop-daemon -K -q -p /var/run/quectelcm.pid \
+                -x /usr/sbin/quectel-up
+}
+
+case "$1" in
+  start)
+        start
+        ;;
+  stop)
+        stop
+        ;;
+  restart|reload)
+        stop
+        start
+        ;;
+  *)
+        echo "Usage: $0 {start|stop|restart}"
+        exit 1
+esac
+
+exit $?

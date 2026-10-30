@@ -1,7 +1,7 @@
-From 53e7b73b906ec69fe7ab592027ea0d11229f48a0 Mon Sep 17 00:00:00 2001
+From aac82bb254a76796faae17f6668de29a6d3379d1 Mon Sep 17 00:00:00 2001
 From: Jeffy Chen <jeffy.chen@rock-chips.com>
 Date: Thu, 19 Nov 2020 09:41:47 +0800
-Subject: [PATCH 023/104] backend-drm: Support mirror mode
+Subject: [PATCH 23/98] backend-drm: Support mirror mode
 
 Set env "WESTON_DRM_MIRROR" to enable mirror mode, and set env
 "WESTON_DRM_KEEP_RATIO" to keep the aspect ratio.
@@ -12,17 +12,14 @@ Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
  desktop-shell/shell.c                 |   7 +-
  include/libweston/libweston.h         |   4 +
  libweston/backend-drm/drm-gbm.c       |   4 +-
- libweston/backend-drm/drm-internal.h  |  14 +
- libweston/backend-drm/drm.c           | 232 ++++++++++++-
- libweston/backend-drm/fb-convert.c    | 453 ++++++++++++++++++++++++++
- libweston/backend-drm/meson.build     |   6 +-
- libweston/backend-drm/state-helpers.c |  20 ++
- libweston/backend-drm/state-propose.c |  30 +-
+ libweston/backend-drm/drm-internal.h  |  10 +
+ libweston/backend-drm/drm.c           | 333 +++++++++++++++++++++++++-
+ libweston/backend-drm/meson.build     |   3 +-
+ libweston/backend-drm/state-propose.c |  23 +-
  libweston/compositor.c                |  24 +-
  libweston/input.c                     |  13 +-
  meson.build                           |   5 +
- 13 files changed, 790 insertions(+), 31 deletions(-)
- create mode 100644 libweston/backend-drm/fb-convert.c
+ 11 files changed, 411 insertions(+), 24 deletions(-)
 
 diff --git a/clients/desktop-shell.c b/clients/desktop-shell.c
 index f50097976..aea02d44f 100644
@@ -109,7 +106,7 @@ index 77f8d6b48..98e0cae2c 100644
  	}
  
 diff --git a/libweston/backend-drm/drm-internal.h b/libweston/backend-drm/drm-internal.h
-index ac01832b1..4e416bc2d 100644
+index 24845d236..0d537db76 100644
 --- a/libweston/backend-drm/drm-internal.h
 +++ b/libweston/backend-drm/drm-internal.h
 @@ -283,6 +283,8 @@ struct drm_backend {
@@ -121,7 +118,7 @@ index ac01832b1..4e416bc2d 100644
  };
  
  struct drm_mode {
-@@ -602,6 +604,10 @@ struct drm_output {
+@@ -603,6 +605,10 @@ struct drm_output {
  	struct weston_renderbuffer *renderbuffer[2];
  	int current_image;
  
@@ -132,7 +129,7 @@ index ac01832b1..4e416bc2d 100644
  	struct vaapi_recorder *recorder;
  	struct wl_listener recorder_frame_listener;
  
-@@ -618,6 +624,10 @@ struct drm_output {
+@@ -619,6 +625,10 @@ struct drm_output {
  
  	/* The dummy framebuffer for SET_CRTC. */
  	struct drm_fb *fb_dummy;
@@ -143,19 +140,23 @@ index ac01832b1..4e416bc2d 100644
  };
  
  void
-@@ -953,3 +963,7 @@ drm_output_render_gl(struct drm_output_state *state, pixman_region32_t *damage)
- 	return NULL;
- }
- #endif
-+
-+bool
-+drm_fb_convert(struct drm_fb *src, struct drm_fb *dst, int rotation,
-+               int src_width, int src_height);
 diff --git a/libweston/backend-drm/drm.c b/libweston/backend-drm/drm.c
-index ae09068e1..6c8e4c91c 100644
+index 20b5be80a..f1a5a5e15 100644
 --- a/libweston/backend-drm/drm.c
 +++ b/libweston/backend-drm/drm.c
-@@ -88,6 +88,24 @@ drm_head_is_external(struct drm_head *head)
+@@ -70,6 +70,11 @@
+ #include "linux-dmabuf-unstable-v1-server-protocol.h"
+ #include "linux-explicit-synchronization.h"
+ 
++#ifdef HAVE_RGA
++#include <rga/rga.h>
++#include <rga/RgaApi.h>
++#endif
++
+ static const char default_seat[] = "seat0";
+ 
+ static inline bool
+@@ -88,6 +93,120 @@ drm_head_is_external(struct drm_head *head)
  	}
  };
  
@@ -177,10 +178,106 @@ index ae09068e1..6c8e4c91c 100644
 +	}
 +}
 +
++#ifdef HAVE_RGA
++static inline RgaSURF_FORMAT
++rga_get_format(const struct pixel_format_info *format)
++{
++	switch (format->format) {
++	case DRM_FORMAT_XRGB8888:
++		return RK_FORMAT_BGRX_8888;
++	case DRM_FORMAT_ARGB8888:
++		return RK_FORMAT_BGRA_8888;
++	case DRM_FORMAT_RGB565:
++		return RK_FORMAT_RGB_565;
++	default:
++		return RK_FORMAT_UNKNOWN;
++	}
++}
++#endif
++
++static int
++drm_copy_fb(struct drm_fb *src, struct drm_fb *dst, int rotation,
++	    int src_width, int src_height)
++{
++#ifndef HAVE_RGA
++	/* TODO: Use pixman to do the copy */
++	weston_log("rga not supported\n");
++	return -1;
++#else
++	RgaSURF_FORMAT src_format, dst_format;
++	rga_info_t src_info = {0};
++	rga_info_t dst_info = {0};
++	int src_fd, dst_fd;
++	int ret;
++
++	static bool rga_supported = true;
++	static bool rga_inited = false;
++
++	if (!rga_supported)
++		return -1;
++
++	if (!rga_inited) {
++		ret = c_RkRgaInit();
++		if (ret < 0) {
++			weston_log("rga not supported\n");
++			rga_supported = false;
++			return ret;
++		}
++		rga_inited = true;
++	}
++
++	src_format = rga_get_format(src->format);
++	dst_format = rga_get_format(dst->format);
++
++	if (src_format == RK_FORMAT_UNKNOWN ||
++	    dst_format == RK_FORMAT_UNKNOWN) {
++		weston_log("unsupported fb format\n");
++		return -1;
++	}
++
++	ret = drmPrimeHandleToFD(src->fd, src->handles[0],
++				 DRM_CLOEXEC, &src_fd);
++	if (ret < 0)
++		return ret;
++
++	ret = drmPrimeHandleToFD(dst->fd, dst->handles[0],
++				 DRM_CLOEXEC, &dst_fd);
++	if (ret < 0)
++		goto close_src;
++
++	src_info.fd = src_fd;
++	src_info.mmuFlag = 1;
++
++	rga_set_rect(&src_info.rect, 0, 0, src_width, src_height,
++		     src->strides[0] * 8 / src->format->bpp, src->height,
++		     src_format);
++
++	if (rotation == 90)
++		src_info.rotation = HAL_TRANSFORM_ROT_90;
++	else if (rotation == 180)
++		src_info.rotation = HAL_TRANSFORM_ROT_180;
++	else if (rotation == 270)
++		src_info.rotation = HAL_TRANSFORM_ROT_270;
++
++	dst_info.fd = dst_fd;
++	dst_info.mmuFlag = 1;
++
++	rga_set_rect(&dst_info.rect, 0, 0, dst->width, dst->height,
++		     dst->strides[0] * 8 / dst->format->bpp, dst->height,
++		     dst_format);
++
++	ret = c_RkRgaBlit(&src_info, &dst_info, NULL);
++	close(dst_fd);
++close_src:
++	close(src_fd);
++	return ret;
++#endif
++}
++
  static void
  drm_backend_update_outputs(struct drm_backend *b)
  {
-@@ -97,6 +115,28 @@ drm_backend_update_outputs(struct drm_backend *b)
+@@ -97,6 +216,28 @@ drm_backend_update_outputs(struct drm_backend *b)
  		return;
  
  	primary = b->primary_head->base.output;
@@ -209,7 +306,7 @@ index ae09068e1..6c8e4c91c 100644
  	if (!primary)
  		return;
  
-@@ -432,21 +472,86 @@ drm_output_render_pixman(struct drm_output_state *state,
+@@ -437,21 +578,86 @@ drm_output_render_pixman(struct drm_output_state *state,
  	return drm_fb_ref(output->dumb[output->current_image]);
  }
  
@@ -297,7 +394,7 @@ index ae09068e1..6c8e4c91c 100644
  
  	/* If we already have a client buffer promoted to scanout, then we don't
  	 * want to render. */
-@@ -458,6 +563,37 @@ drm_output_render(struct drm_output_state *state)
+@@ -463,6 +669,37 @@ drm_output_render(struct drm_output_state *state)
  
  	weston_output_flush_damage_for_primary_plane(&output->base, &damage);
  
@@ -335,7 +432,7 @@ index ae09068e1..6c8e4c91c 100644
  	/*
  	 * If we don't have any damage on the primary plane, and we already
  	 * have a renderer buffer active, we can reuse it; else we pass
-@@ -478,24 +614,86 @@ drm_output_render(struct drm_output_state *state)
+@@ -483,24 +720,86 @@ drm_output_render(struct drm_output_state *state)
  		fb = drm_output_render_gl(state, &damage);
  	}
  
@@ -388,8 +485,8 @@ index ae09068e1..6c8e4c91c 100644
 +			goto err;
 +		}
 +
-+		if (!drm_fb_convert(fb, wrap_fb, rotation, sw, sh)) {
-+			weston_log("failed to convert fb\n");
++		if (drm_copy_fb(fb, wrap_fb, rotation, sw, sh) < 0) {
++			weston_log("failed to copy fb\n");
 +			goto err;
 +		}
 +
@@ -413,23 +510,23 @@ index ae09068e1..6c8e4c91c 100644
 -	scanout_state->src_h = fb->height << 16;
 +	scanout_state->src_w = sw << 16;
 +	scanout_state->src_h = sh << 16;
++
++	scanout_state->dest_x = dx;
++	scanout_state->dest_y = dy;
++	scanout_state->dest_w = dw;
++	scanout_state->dest_h = dh;
  
 -	mode = to_drm_mode(output->base.current_mode);
 -	scanout_state->dest_x = 0;
 -	scanout_state->dest_y = 0;
 -	scanout_state->dest_w = mode->mode_info.hdisplay;
 -	scanout_state->dest_h = mode->mode_info.vdisplay;
-+	scanout_state->dest_x = dx;
-+	scanout_state->dest_y = dy;
-+	scanout_state->dest_w = dw;
-+	scanout_state->dest_h = dh;
-+
 +	if (output->is_mirror)
 +		return;
  
  	scanout_state->zpos = scanout_plane->zpos_min;
  
-@@ -526,6 +724,12 @@ drm_output_render(struct drm_output_state *state)
+@@ -531,6 +830,12 @@ drm_output_render(struct drm_output_state *state)
  	pixman_region32_fini(&scanout_damage);
  out:
  	pixman_region32_fini(&damage);
@@ -442,7 +539,7 @@ index ae09068e1..6c8e4c91c 100644
  }
  
  static uint32_t
-@@ -1744,8 +1948,8 @@ drm_output_fini_pixman(struct drm_output *output)
+@@ -1743,8 +2048,8 @@ drm_output_fini_pixman(struct drm_output *output)
  	/* Destroying the Pixman surface will destroy all our buffers,
  	 * regardless of refcount. Ensure we destroy them here. */
  	if (!b->compositor->shutting_down &&
@@ -453,7 +550,7 @@ index ae09068e1..6c8e4c91c 100644
  		drm_plane_reset_state(output->scanout_plane);
  	}
  
-@@ -2532,6 +2736,8 @@ drm_output_destroy(struct weston_output *base)
+@@ -2531,6 +2836,8 @@ drm_output_destroy(struct weston_output *base)
  
  	wl_list_remove(&output->disable_head);
  
@@ -462,7 +559,7 @@ index ae09068e1..6c8e4c91c 100644
  	free(output);
  }
  
-@@ -4295,6 +4501,12 @@ drm_backend_create(struct weston_compositor *compositor,
+@@ -4294,6 +4601,12 @@ drm_backend_create(struct weston_compositor *compositor,
  	if (buf)
  		sscanf(buf, "%dx%d", &b->virtual_width, &b->virtual_height);
  
@@ -475,487 +572,11 @@ index ae09068e1..6c8e4c91c 100644
  	device = zalloc(sizeof *device);
  	if (device == NULL)
  		goto err_backend;
-diff --git a/libweston/backend-drm/fb-convert.c b/libweston/backend-drm/fb-convert.c
-new file mode 100644
-index 000000000..fea114eb4
---- /dev/null
-+++ b/libweston/backend-drm/fb-convert.c
-@@ -0,0 +1,453 @@
-+/*
-+ * Copyright (c) 2025 Rockchip Electronics Co., Ltd
-+ *
-+ * Permission is hereby granted, free of charge, to any person obtaining
-+ * a copy of this software and associated documentation files (the
-+ * "Software"), to deal in the Software without restriction, including
-+ * without limitation the rights to use, copy, modify, merge, publish,
-+ * distribute, sublicense, and/or sell copies of the Software, and to
-+ * permit persons to whom the Software is furnished to do so, subject to
-+ * the following conditions:
-+ *
-+ * The above copyright notice and this permission notice (including the
-+ * next paragraph) shall be included in all copies or substantial
-+ * portions of the Software.
-+ *
-+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ * NONINFRINGEMENT.  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
-+ * BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-+ * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-+ * SOFTWARE.
-+ */
-+
-+#include "config.h"
-+
-+#include <stdint.h>
-+
-+#include <drm_fourcc.h>
-+#include <xf86drm.h>
-+#include <xf86drmMode.h>
-+
-+#include "pixel-formats.h"
-+#include "drm-internal.h"
-+
-+#if defined(HAVE_EGL) && defined(HAVE_GLES2) && defined(HAVE_GBM)
-+#define EGL_CONVERT
-+#endif
-+
-+#ifdef EGL_CONVERT
-+#include <gbm.h>
-+#include <EGL/egl.h>
-+#include <EGL/eglext.h>
-+#include <GLES2/gl2.h>
-+#include <GLES2/gl2ext.h>
-+#endif
-+
-+#ifdef HAVE_RGA
-+#include <rga/rga.h>
-+#include <rga/RgaApi.h>
-+#endif
-+
-+struct fb_convert_ctx {
-+#ifdef EGL_CONVERT
-+	int drm_fd;
-+	struct gbm_device *gbm;
-+	EGLDisplay display;
-+	EGLContext context;
-+	GLuint vs;
-+	GLuint fs;
-+	GLuint program;
-+
-+	bool egl_inited;
-+#endif
-+#ifdef HAVE_RGA
-+	bool rga_unavailable;
-+	bool rga_inited;
-+#endif
-+} fb_ctx;
-+
-+#ifdef EGL_CONVERT
-+#define EGL_LOAD_PROC(val, type, func) \
-+	do { val = (type) eglGetProcAddress(func); } while (0)
-+
-+static const char* vs_src =
-+"attribute vec4 position;\n"
-+"uniform int rotation;\n"
-+"varying vec2 texcoord;\n"
-+"void main() {\n"
-+"   vec2 pos = position.xy;\n"
-+"   if (rotation == 1) {\n"
-+"       pos = vec2(pos.y, -pos.x);\n"
-+"   } else if (rotation == 2) {\n"
-+"       pos = vec2(-pos.x, -pos.y);\n"
-+"   } else if (rotation == 3) {\n"
-+"       pos = vec2(-pos.y, pos.x);\n"
-+"   }\n"
-+"   gl_Position = vec4(pos, 0.0, 1.0);\n"
-+"   vec2 orig_tex = pos.xy * 0.5 + 0.5;\n"
-+"   if (rotation == 1) {\n"
-+"       texcoord = vec2(orig_tex.y, 1.0 - orig_tex.x);\n"
-+"   } else if (rotation == 2) {\n"
-+"       texcoord = vec2(1.0 - orig_tex.x, 1.0 - orig_tex.y);\n"
-+"   } else if (rotation == 3) {\n"
-+"       texcoord = vec2(1.0 - orig_tex.y, orig_tex.x);\n"
-+"   } else {\n"
-+"       texcoord = orig_tex;\n"
-+"   }\n"
-+"}\n";
-+
-+static const char* fs_src =
-+"#extension GL_OES_EGL_image_external : require\n"
-+"precision mediump float;\n"
-+"varying vec2 texcoord;\n"
-+"uniform samplerExternalOES tex;\n"
-+"void main() {\n"
-+"   gl_FragColor = texture2D(tex, texcoord);\n"
-+"}\n";
-+
-+static void
-+egl_deinit(void)
-+{
-+	if (fb_ctx.display != EGL_NO_DISPLAY) {
-+		if (fb_ctx.program)
-+			glDeleteProgram(fb_ctx.program);
-+		if (fb_ctx.vs)
-+			glDeleteShader(fb_ctx.vs);
-+		if (fb_ctx.fs)
-+			glDeleteShader(fb_ctx.fs);
-+		if (fb_ctx.context != EGL_NO_CONTEXT)
-+			eglDestroyContext(fb_ctx.display, fb_ctx.context);
-+
-+		eglTerminate(fb_ctx.display);
-+	}
-+
-+	if (fb_ctx.gbm)
-+		gbm_device_destroy(fb_ctx.gbm);
-+
-+	if (fb_ctx.drm_fd >= 0)
-+		close(fb_ctx.drm_fd);
-+
-+	memset(&fb_ctx, 0, sizeof(fb_ctx));
-+}
-+
-+static GLuint
-+egl_compile_shader(GLenum type, const char* src) {
-+	GLuint shader;
-+	GLint status;
-+
-+	shader = glCreateShader(type);
-+	glShaderSource(shader, 1, &src, NULL);
-+	glCompileShader(shader);
-+
-+	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
-+	if (!status)
-+		return 0;
-+
-+	return shader;
-+}
-+
-+static bool
-+egl_init(void)
-+{
-+	PFNEGLGETPLATFORMDISPLAYEXTPROC get_platform_display;
-+	GLint status;
-+
-+	const EGLint context_attrs[] = {
-+		EGL_CONTEXT_CLIENT_VERSION, 2,
-+		EGL_NONE,
-+	};
-+
-+	if (fb_ctx.egl_inited)
-+		return true;
-+
-+	EGL_LOAD_PROC(get_platform_display, PFNEGLGETPLATFORMDISPLAYEXTPROC,
-+		      "eglGetPlatformDisplayEXT");
-+	if (!get_platform_display)
-+		return false;
-+
-+	fb_ctx.drm_fd = drmOpen("rockchip", NULL);
-+	if (fb_ctx.drm_fd < 0)
-+		goto err;
-+
-+	fb_ctx.gbm = gbm_create_device(fb_ctx.drm_fd);
-+	if (!fb_ctx.gbm)
-+		goto err;
-+
-+	fb_ctx.display = get_platform_display(EGL_PLATFORM_GBM_KHR,
-+					    (void*)fb_ctx.gbm, NULL);
-+	if (fb_ctx.display == EGL_NO_DISPLAY)
-+		goto err;
-+
-+	if (!eglInitialize(fb_ctx.display, NULL, NULL))
-+		goto err;
-+
-+	if (!eglBindAPI(EGL_OPENGL_ES_API))
-+		goto err;
-+
-+	fb_ctx.context = eglCreateContext(fb_ctx.display, NULL, EGL_NO_CONTEXT,
-+					context_attrs);
-+	if (fb_ctx.context == EGL_NO_CONTEXT)
-+		goto err;
-+
-+	eglMakeCurrent(fb_ctx.display, EGL_NO_SURFACE, EGL_NO_SURFACE,
-+		       fb_ctx.context);
-+
-+	fb_ctx.vs = egl_compile_shader(GL_VERTEX_SHADER, vs_src);
-+	fb_ctx.fs = egl_compile_shader(GL_FRAGMENT_SHADER, fs_src);
-+
-+	fb_ctx.program = glCreateProgram();
-+	glAttachShader(fb_ctx.program, fb_ctx.vs);
-+	glAttachShader(fb_ctx.program, fb_ctx.fs);
-+	glLinkProgram(fb_ctx.program);
-+
-+	glGetProgramiv(fb_ctx.program, GL_LINK_STATUS, &status);
-+	if (!status)
-+		goto err;
-+
-+	eglMakeCurrent(fb_ctx.display, EGL_NO_SURFACE, EGL_NO_SURFACE,
-+		       EGL_NO_CONTEXT);
-+
-+	fb_ctx.egl_inited = true;
-+	return true;
-+err:
-+	egl_deinit();
-+	return false;
-+}
-+
-+static bool
-+egl_load_dmabuf(EGLDisplay display, GLuint tex,
-+		int fd, uint32_t format, int width, int height, int stride) {
-+	PFNGLEGLIMAGETARGETTEXTURE2DOESPROC image_target_texture_2d = NULL;
-+	PFNEGLCREATEIMAGEKHRPROC create_image = NULL;
-+	PFNEGLDESTROYIMAGEKHRPROC destroy_image = NULL;
-+	EGLint attribs[] = {
-+		EGL_WIDTH, width,
-+		EGL_HEIGHT, height,
-+		EGL_LINUX_DRM_FOURCC_EXT, format,
-+		EGL_DMA_BUF_PLANE0_FD_EXT, fd,
-+		EGL_DMA_BUF_PLANE0_OFFSET_EXT, 0,
-+		EGL_DMA_BUF_PLANE0_PITCH_EXT, stride,
-+		EGL_NONE,
-+	};
-+	EGLImageKHR image;
-+
-+	EGL_LOAD_PROC(create_image, PFNEGLCREATEIMAGEKHRPROC,
-+		      "eglCreateImageKHR");
-+	EGL_LOAD_PROC(destroy_image, PFNEGLDESTROYIMAGEKHRPROC,
-+		      "eglDestroyImageKHR");
-+	EGL_LOAD_PROC(image_target_texture_2d, PFNGLEGLIMAGETARGETTEXTURE2DOESPROC,
-+		      "glEGLImageTargetTexture2DOES");
-+	if (!create_image || !destroy_image || !image_target_texture_2d)
-+		return false;
-+
-+	image = create_image(display, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT,
-+			     NULL, attribs);
-+	if (image == EGL_NO_IMAGE)
-+		return false;
-+
-+	glBindTexture(GL_TEXTURE_EXTERNAL_OES, tex);
-+	image_target_texture_2d(GL_TEXTURE_EXTERNAL_OES, image);
-+
-+	destroy_image(display, image);
-+	return true;
-+}
-+
-+static bool
-+drm_fb_convert_egl(struct drm_fb *src, struct drm_fb *dst, int rotation,
-+		   int src_width, int src_height)
-+{
-+	GLuint fbo = 0, src_tex = 0, dst_tex = 0;
-+	GLint rot_loc, pos_loc;
-+	GLint status;
-+	int src_fd = -1, dst_fd = -1;
-+	bool ret = false;
-+
-+	EGLDisplay old_display = eglGetCurrentDisplay();
-+	EGLContext old_context = eglGetCurrentContext();
-+	EGLSurface old_draw_surface = eglGetCurrentSurface(EGL_DRAW);
-+	EGLSurface old_read_surface = eglGetCurrentSurface(EGL_READ);
-+
-+	GLfloat verts[] = {
-+		-1.0f, -1.0f,
-+		 1.0f, -1.0f,
-+		-1.0f,  1.0f,
-+		 1.0f,  1.0f,
-+	};
-+
-+	if (!egl_init())
-+		goto out;
-+
-+	if (drmPrimeHandleToFD(src->fd, src->handles[0],
-+			       DRM_CLOEXEC, &src_fd) < 0)
-+		goto out;
-+
-+	if (drmPrimeHandleToFD(dst->fd, dst->handles[0],
-+			       DRM_CLOEXEC, &dst_fd) < 0)
-+		goto out;
-+
-+	eglMakeCurrent(fb_ctx.display, EGL_NO_SURFACE, EGL_NO_SURFACE,
-+		       fb_ctx.context);
-+
-+	glGenTextures(1, &src_tex);
-+	if (!egl_load_dmabuf(fb_ctx.display, src_tex, src_fd, src->format->format,
-+			     src_width, src_height, src->strides[0]))
-+		goto out;
-+
-+	glGenTextures(1, &dst_tex);
-+	if (!egl_load_dmabuf(fb_ctx.display, dst_tex, dst_fd, dst->format->format,
-+			     dst->width, dst->height, dst->strides[0]))
-+		goto out;
-+
-+	glGenFramebuffers(1, &fbo);
-+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-+
-+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-+			       GL_TEXTURE_EXTERNAL_OES, dst_tex, 0);
-+	status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-+	if (status != GL_FRAMEBUFFER_COMPLETE)
-+		goto out;
-+
-+	glViewport(0, 0, dst->width, dst->height);
-+
-+	glUseProgram(fb_ctx.program);
-+
-+	rot_loc = glGetUniformLocation(fb_ctx.program, "rotation");
-+	glUniform1i(rot_loc, rotation / 90);
-+
-+	glActiveTexture(GL_TEXTURE0);
-+	glBindTexture(GL_TEXTURE_EXTERNAL_OES, src_tex);
-+
-+	glUniform1i(glGetUniformLocation(fb_ctx.program, "tex"), 0);
-+
-+	pos_loc = glGetAttribLocation(fb_ctx.program, "position");
-+	glVertexAttribPointer(pos_loc, 2, GL_FLOAT, GL_FALSE, 0, verts);
-+	glEnableVertexAttribArray(pos_loc);
-+
-+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-+	glFinish();
-+
-+	ret = true;
-+out:
-+	if (src_fd >= 0)
-+		close(src_fd);
-+	if (dst_fd >= 0)
-+		close(dst_fd);
-+
-+	if (fbo)
-+		glDeleteFramebuffers(1, &fbo);
-+	if (dst_tex)
-+		glDeleteTextures(1, &dst_tex);
-+	if (src_tex)
-+		glDeleteTextures(1, &src_tex);
-+
-+	eglMakeCurrent(old_display, old_draw_surface, old_read_surface,
-+		       old_context);
-+
-+	return ret;
-+}
-+#endif
-+
-+#ifdef HAVE_RGA
-+static inline RgaSURF_FORMAT
-+rga_get_format(const struct pixel_format_info *format)
-+{
-+	switch (format->format) {
-+	case DRM_FORMAT_XRGB8888:
-+		return RK_FORMAT_BGRX_8888;
-+	case DRM_FORMAT_ARGB8888:
-+		return RK_FORMAT_BGRA_8888;
-+	case DRM_FORMAT_RGB565:
-+		return RK_FORMAT_RGB_565;
-+	default:
-+		return RK_FORMAT_UNKNOWN;
-+	}
-+}
-+
-+static bool
-+drm_fb_convert_rga(struct drm_fb *src, struct drm_fb *dst, int rotation,
-+		   int src_width, int src_height)
-+{
-+	RgaSURF_FORMAT src_format, dst_format;
-+	rga_info_t src_info = {0};
-+	rga_info_t dst_info = {0};
-+	int src_fd, dst_fd;
-+	int ret;
-+
-+	if (fb_ctx.rga_unavailable)
-+		return false;
-+
-+	if (!fb_ctx.rga_inited) {
-+		ret = c_RkRgaInit();
-+		if (ret < 0) {
-+			weston_log("RGA not available\n");
-+			fb_ctx.rga_unavailable = true;
-+			return false;
-+		}
-+		fb_ctx.rga_inited = true;
-+	}
-+
-+	src_format = rga_get_format(src->format);
-+	dst_format = rga_get_format(dst->format);
-+
-+	if (src_format == RK_FORMAT_UNKNOWN ||
-+	    dst_format == RK_FORMAT_UNKNOWN)
-+		return false;
-+
-+	ret = drmPrimeHandleToFD(src->fd, src->handles[0],
-+				 DRM_CLOEXEC, &src_fd);
-+	if (ret < 0)
-+		return false;
-+
-+	ret = drmPrimeHandleToFD(dst->fd, dst->handles[0],
-+				 DRM_CLOEXEC, &dst_fd);
-+	if (ret < 0)
-+		goto close_src;
-+
-+	src_info.fd = src_fd;
-+	src_info.mmuFlag = 1;
-+
-+	rga_set_rect(&src_info.rect, 0, 0, src_width, src_height,
-+		     src->strides[0] * 8 / src->format->bpp, src->height,
-+		     src_format);
-+
-+	if (rotation == 90)
-+		src_info.rotation = HAL_TRANSFORM_ROT_90;
-+	else if (rotation == 180)
-+		src_info.rotation = HAL_TRANSFORM_ROT_180;
-+	else if (rotation == 270)
-+		src_info.rotation = HAL_TRANSFORM_ROT_270;
-+
-+	dst_info.fd = dst_fd;
-+	dst_info.mmuFlag = 1;
-+
-+	rga_set_rect(&dst_info.rect, 0, 0, dst->width, dst->height,
-+		     dst->strides[0] * 8 / dst->format->bpp, dst->height,
-+		     dst_format);
-+
-+	ret = c_RkRgaBlit(&src_info, &dst_info, NULL);
-+	close(dst_fd);
-+close_src:
-+	close(src_fd);
-+	return ret < 0 ? false : true;
-+}
-+#endif
-+
-+bool
-+drm_fb_convert(struct drm_fb *src, struct drm_fb *dst, int rotation,
-+	       int src_width, int src_height)
-+{
-+#ifdef EGL_CONVERT
-+	if (drm_fb_convert_egl(src, dst, rotation, src_width, src_height)) {
-+		return true;
-+}
-+#endif
-+#ifdef HAVE_RGA
-+	if (drm_fb_convert_rga(src, dst, rotation, src_width, src_height))
-+		return true;
-+#endif
-+	weston_log("Unable to convert fb!\n");
-+	return false;
-+}
 diff --git a/libweston/backend-drm/meson.build b/libweston/backend-drm/meson.build
-index 002669e61..13bc0c303 100644
+index 002669e61..e13944160 100644
 --- a/libweston/backend-drm/meson.build
 +++ b/libweston/backend-drm/meson.build
-@@ -36,6 +36,7 @@ config_h.set('BUILD_DRM_COMPOSITOR', '1')
- srcs_drm = [
- 	'drm.c',
- 	'fb.c',
-+	'fb-convert.c',
- 	'modes.c',
- 	'kms.c',
- 	'kms-color.c',
-@@ -48,6 +49,8 @@ srcs_drm = [
- 
- deps_drm = [
- 	dep_egl, # optional
-+	dep_gles2, # optional
-+	dep_gbm, # optional
- 	dep_libm,
- 	dep_libdl,
- 	dep_libshared,
-@@ -57,7 +60,8 @@ deps_drm = [
+@@ -57,7 +57,8 @@ deps_drm = [
  	dep_libinput_backend,
  	dependency('libudev', version: '>= 136'),
  	dep_libdisplay_info,
@@ -965,39 +586,8 @@ index 002669e61..13bc0c303 100644
  ]
  
  if get_option('renderer-gl')
-diff --git a/libweston/backend-drm/state-helpers.c b/libweston/backend-drm/state-helpers.c
-index b85fe4230..a41cb719f 100644
---- a/libweston/backend-drm/state-helpers.c
-+++ b/libweston/backend-drm/state-helpers.c
-@@ -254,6 +254,26 @@ drm_plane_state_coords_for_paint_node(struct drm_plane_state *state,
- 	state->dest_w = box->x2 - box->x1;
- 	state->dest_h = box->y2 - box->y1;
- 
-+	// HACK: Based on drm.c's drm_output_render()
-+	sxf1 = output->plane_bounds.x1;
-+	syf1 = output->plane_bounds.y1;
-+	if (output->plane_bounds.x2 && output->plane_bounds.y2) {
-+		sxf2 = output->plane_bounds.x2 - sxf1;
-+		syf2 = output->plane_bounds.y2 - syf1;
-+	} else {
-+		struct drm_mode *mode = to_drm_mode(output->base.current_mode);
-+		sxf2 = mode->mode_info.hdisplay;
-+		syf2 = mode->mode_info.vdisplay;
-+	}
-+	sxf2 /= output->base.current_mode->width;
-+	syf2 /= output->base.current_mode->height;
-+
-+	// HACK: Convert with plane bounds
-+	state->dest_x = state->dest_x * sxf2 + sxf1;
-+	state->dest_y = state->dest_y * syf2 + syf1;
-+	state->dest_w = state->dest_w * sxf2;
-+	state->dest_h = state->dest_h * syf2;
-+
- 	/* Now calculate the source rectangle, by transforming the destination
- 	 * rectangle by the output to buffer matrix. */
- 	corners[0] = weston_matrix_transform_coord(
 diff --git a/libweston/backend-drm/state-propose.c b/libweston/backend-drm/state-propose.c
-index 1e62e2b46..fae05131d 100644
+index 1e62e2b46..7e8b57425 100644
 --- a/libweston/backend-drm/state-propose.c
 +++ b/libweston/backend-drm/state-propose.c
 @@ -55,6 +55,21 @@ static const char *const drm_output_propose_state_mode_as_string[] = {
@@ -1022,21 +612,7 @@ index 1e62e2b46..fae05131d 100644
  static const char *
  drm_propose_state_mode_to_string(enum drm_output_propose_state_mode mode)
  {
-@@ -122,13 +137,6 @@ drm_output_try_paint_node_on_plane(struct drm_plane *plane,
- 		goto out;
- 	}
- 
--	/* Should've been ensured by weston_view_matches_entire_output. */
--	if (plane->type == WDRM_PLANE_TYPE_PRIMARY) {
--		assert(state->dest_x == 0 && state->dest_y == 0 &&
--		       state->dest_w == (unsigned) output->base.current_mode->width &&
--		       state->dest_h == (unsigned) output->base.current_mode->height);
--	}
--
- 	/* We hold one reference for the lifetime of this function; from
- 	 * calling drm_fb_get_from_paint_node() in
- 	 * drm_output_prepare_plane_view(), so, we take another reference
-@@ -434,7 +442,8 @@ drm_output_find_plane_for_view(struct drm_output_state *state,
+@@ -434,7 +449,8 @@ drm_output_find_plane_for_view(struct drm_output_state *state,
  			FAILURE_REASONS_FB_FORMAT_INCOMPATIBLE;
  		return NULL;
  	} else if (buffer->type == WESTON_BUFFER_SHM) {
@@ -1046,7 +622,7 @@ index 1e62e2b46..fae05131d 100644
  			pnode->try_view_on_plane_failure_reasons |=
  				FAILURE_REASONS_FB_FORMAT_INCOMPATIBLE;
  			return NULL;
-@@ -980,7 +989,10 @@ drm_assign_planes(struct weston_output *output_base)
+@@ -980,7 +996,10 @@ drm_assign_planes(struct weston_output *output_base)
  	drm_debug(b, "\t[repaint] preparing state for output %s (%lu)\n",
  		  output_base->name, (unsigned long) output_base->id);
  
@@ -1059,7 +635,7 @@ index 1e62e2b46..fae05131d 100644
  		state = drm_output_propose_state(output_base, pending_state, mode);
  		if (!state) {
 diff --git a/libweston/compositor.c b/libweston/compositor.c
-index ab2791450..1031db411 100644
+index 8bf6677b4..e7e8f12a1 100644
 --- a/libweston/compositor.c
 +++ b/libweston/compositor.c
 @@ -1657,7 +1657,7 @@ weston_view_assign_output(struct weston_view *ev)
@@ -1071,7 +647,7 @@ index ab2791450..1031db411 100644
  			continue;
  
  		pixman_region32_intersect(&region, &ev->transform.boundingbox,
-@@ -6338,6 +6338,9 @@ bind_output(struct wl_client *client,
+@@ -6346,6 +6346,9 @@ bind_output(struct wl_client *client,
  static void
  weston_head_add_global(struct weston_head *head)
  {
@@ -1081,7 +657,7 @@ index ab2791450..1031db411 100644
  	head->global = wl_global_create(head->compositor->wl_display,
  					&wl_output_interface, 4,
  					head, bind_output);
-@@ -6437,6 +6440,15 @@ weston_head_remove_global(struct weston_head *head)
+@@ -6445,6 +6448,15 @@ weston_head_remove_global(struct weston_head *head)
          }
  }
  
@@ -1097,7 +673,7 @@ index ab2791450..1031db411 100644
  /** Get the backing object of wl_output
   *
   * \param resource A wl_output protocol object.
-@@ -7333,6 +7345,7 @@ WL_EXPORT void
+@@ -7341,6 +7353,7 @@ WL_EXPORT void
  weston_compositor_reflow_outputs(struct weston_compositor *compositor)
  {
  	struct weston_output *output;
@@ -1105,7 +681,7 @@ index ab2791450..1031db411 100644
  	int next_x, next_y;
  
  	if (compositor->output_flow_dirty)
-@@ -7342,7 +7355,10 @@ weston_compositor_reflow_outputs(struct weston_compositor *compositor)
+@@ -7350,7 +7363,10 @@ weston_compositor_reflow_outputs(struct weston_compositor *compositor)
  	wl_list_for_each(output, &compositor->output_list, link) {
  		struct weston_coord_global pos;
  
@@ -1117,7 +693,7 @@ index ab2791450..1031db411 100644
  			continue;
  
  		pos.c = weston_coord(next_x, next_y);
-@@ -7545,11 +7561,11 @@ weston_compositor_add_output(struct weston_compositor *compositor,
+@@ -7553,11 +7569,11 @@ weston_compositor_add_output(struct weston_compositor *compositor,
  	wl_list_insert(compositor->output_list.prev, &output->link);
  	output->enabled = true;
  

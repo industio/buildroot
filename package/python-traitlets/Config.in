@@ -1,5 +1,6 @@
 config BR2_PACKAGE_PYTHON_TRAITLETS
 	bool "python-traitlets"
+	depends on BR2_PACKAGE_PYTHON3
 	help
 	  A configuration system for Python applications.
 

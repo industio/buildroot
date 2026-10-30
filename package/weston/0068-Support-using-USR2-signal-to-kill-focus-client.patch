@@ -1,7 +1,7 @@
-From 2c591fe11d89804c8ab20441725d5d899fb3bd0d Mon Sep 17 00:00:00 2001
+From a3db05eb3dbc9f556f9a92758dc8e1342b50fc66 Mon Sep 17 00:00:00 2001
 From: Jeffy Chen <jeffy.chen@rock-chips.com>
 Date: Sun, 13 Aug 2023 10:48:36 +0800
-Subject: [PATCH 068/100] Support using USR2 signal to kill focus client
+Subject: [PATCH 68/98] Support using USR2 signal to kill focus client
 
 Tested with:
 1/ weston-terminal&
@@ -134,10 +134,10 @@ index d4ec323dd..fb35a3e9c 100644
  	struct wl_signal show_input_panel_signal;
  	struct wl_signal hide_input_panel_signal;
 diff --git a/libweston/compositor.c b/libweston/compositor.c
-index 3809e66d5..b951d66fe 100644
+index dcd4d7cb4..dba1ca514 100644
 --- a/libweston/compositor.c
 +++ b/libweston/compositor.c
-@@ -9772,6 +9772,7 @@ weston_compositor_create(struct wl_display *display,
+@@ -9780,6 +9780,7 @@ weston_compositor_create(struct wl_display *display,
  	wl_signal_init(&ec->kill_signal);
  	wl_signal_init(&ec->idle_signal);
  	wl_signal_init(&ec->wake_signal);

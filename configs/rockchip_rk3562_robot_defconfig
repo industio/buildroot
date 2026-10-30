@@ -12,3 +12,4 @@
 #include "wifibt/wireless.config"
 #include "tools/common.config"
 #include "tools/test.config"
+#include "powermanager.config"

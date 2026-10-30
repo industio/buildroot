@@ -1,7 +1,7 @@
-From 1439724a98b48910e5d29c2416bdff88ef199b08 Mon Sep 17 00:00:00 2001
+From a929100b9854ff721d7a5d9f6cb6d5259994b9da Mon Sep 17 00:00:00 2001
 From: Jeffy Chen <jeffy.chen@rock-chips.com>
 Date: Tue, 16 Jan 2024 16:44:14 +0800
-Subject: [PATCH 081/100] compositor: Skip painting output before initialized
+Subject: [PATCH 81/98] compositor: Skip painting output before initialized
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 ---
@@ -9,7 +9,7 @@ Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
  1 file changed, 12 insertions(+)
 
 diff --git a/libweston/compositor.c b/libweston/compositor.c
-index ad02ecc67..871eb57de 100644
+index 60ca971a0..3d3bb0797 100644
 --- a/libweston/compositor.c
 +++ b/libweston/compositor.c
 @@ -3860,6 +3860,7 @@ weston_output_repaint(struct weston_output *output, struct timespec *now)

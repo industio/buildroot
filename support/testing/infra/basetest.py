@@ -9,8 +9,14 @@ BASIC_TOOLCHAIN_CONFIG = \
     """
     BR2_arm=y
     BR2_TOOLCHAIN_EXTERNAL=y
-    BR2_TOOLCHAIN_EXTERNAL_BOOTLIN=y
-    BR2_TOOLCHAIN_EXTERNAL_BOOTLIN_ARMV5_EABI_GLIBC_STABLE=y
+    BR2_TOOLCHAIN_EXTERNAL_CUSTOM=y
+    BR2_TOOLCHAIN_EXTERNAL_DOWNLOAD=y
+    BR2_TOOLCHAIN_EXTERNAL_URL="https://toolchains.bootlin.com/downloads/releases/toolchains/armv5-eabi/tarballs/armv5-eabi--uclibc--bleeding-edge-2018.11-1.tar.bz2"
+    BR2_TOOLCHAIN_EXTERNAL_GCC_8=y
+    BR2_TOOLCHAIN_EXTERNAL_HEADERS_4_14=y
+    BR2_TOOLCHAIN_EXTERNAL_LOCALE=y
+    BR2_TOOLCHAIN_HAS_THREADS_DEBUG=y
+    BR2_TOOLCHAIN_EXTERNAL_CXX=y
     """
 
 MINIMAL_CONFIG = \
@@ -23,7 +29,6 @@ MINIMAL_CONFIG = \
 
 
 class BRConfigTest(unittest.TestCase):
-    """Test up to the configure stage."""
     config = None
     br2_external = list()
     downloaddir = None
@@ -46,7 +51,7 @@ class BRConfigTest(unittest.TestCase):
 
     def setUp(self):
         self.show_msg("Starting")
-        self.b = Builder(self.config, self.builddir, self.logtofile, self.jlevel)
+        self.b = Builder(self.config, self.builddir, self.logtofile)
 
         if not self.keepbuilds:
             self.b.delete()
@@ -61,7 +66,6 @@ class BRConfigTest(unittest.TestCase):
 
 
 class BRTest(BRConfigTest):
-    """Test up to the build stage and instantiate an emulator."""
     def __init__(self, names):
         super(BRTest, self).__init__(names)
         self.emulator = None
@@ -82,12 +86,7 @@ class BRTest(BRConfigTest):
         super(BRTest, self).tearDown()
 
     # Run the given 'cmd' with a 'timeout' on the target and
-    # assert that the command succeeded; on error, print the
-    # faulty command and its output
+    # assert that the command succeeded
     def assertRunOk(self, cmd, timeout=-1):
-        out, exit_code = self.emulator.run(cmd, timeout)
-        self.assertEqual(
-            exit_code,
-            0,
-            "\nFailed to run: {}\noutput was:\n{}".format(cmd, '  '+'\n  '.join(out))
-        )
+        _, exit_code = self.emulator.run(cmd, timeout)
+        self.assertEqual(exit_code, 0)

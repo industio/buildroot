@@ -1,4 +1,4 @@
-From efd669c3efbc63d56f2dbd0893d446cbdaf89f5d Mon Sep 17 00:00:00 2001
+From bd2e0887b32933ab9ef43302fcd853c96ba11907 Mon Sep 17 00:00:00 2001
 From: Jeffy Chen <jeffy.chen@rock-chips.com>
 Date: Fri, 28 Apr 2023 18:34:49 +0800
 Subject: [PATCH 16/22] xvimagesink: Apply toplevel window's position
@@ -8,14 +8,14 @@ gst-launch-1.0 videotestsrc ! xvimagesink render-rectangle='<100,200,300,400>'
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 ---
- sys/xvimage/xvcontext.c        | 22 ++++++++++++++---
+ sys/xvimage/xvcontext.c        | 18 +++++++++++---
  sys/xvimage/xvcontext.h        |  1 +
  sys/xvimage/xvimageallocator.c | 45 ++++++++++++++++++++++------------
  sys/xvimage/xvimagesink.c      | 20 ++++++++++++---
- 4 files changed, 64 insertions(+), 24 deletions(-)
+ 4 files changed, 60 insertions(+), 24 deletions(-)
 
 diff --git a/sys/xvimage/xvcontext.c b/sys/xvimage/xvcontext.c
-index 97962d9..88aa679 100644
+index 97962d9..5fd1c85 100644
 --- a/sys/xvimage/xvcontext.c
 +++ b/sys/xvimage/xvcontext.c
 @@ -1048,19 +1048,21 @@ gst_xv_touchdevice_free (GstXvTouchDevice * device)
@@ -43,7 +43,7 @@ index 97962d9..88aa679 100644
    window->render_rect.w = width;
    window->render_rect.h = height;
    window->have_render_rect = FALSE;
-@@ -1079,7 +1081,19 @@ gst_xvcontext_create_xwindow (GstXvContext * context, gint width, gint height,
+@@ -1079,7 +1081,15 @@ gst_xvcontext_create_xwindow (GstXvContext * context, gint width, gint height,
    g_mutex_lock (&context->lock);
  
    window->win = XCreateSimpleWindow (context->disp,
@@ -51,14 +51,10 @@ index 97962d9..88aa679 100644
 +      context->root, x, y, width, height, 0, 0, context->black);
 +
 +  /* Apply size hints */
-+  hints.flags = USSize;
-+
-+  if (x || y)
-+    hints.flags |= USPosition;
-+
++  hints.flags  = USPosition | USSize;
 +  hints.x = x;
 +  hints.y = y;
-+  hints.width = width;
++  hints.width  = width;
 +  hints.height = height;
 +  XSetWMNormalHints (context->disp, window->win, &hints);
  
@@ -77,7 +73,7 @@ index 1fb7614..9f535ae 100644
                                                   gboolean decorations);
  GstXWindow *   gst_xvcontext_create_xwindow_from_xid (GstXvContext * context, XID xid);
 diff --git a/sys/xvimage/xvimageallocator.c b/sys/xvimage/xvimageallocator.c
-index a6d8432..b82c3c7 100644
+index a6d8432..e5264b7 100644
 --- a/sys/xvimage/xvimageallocator.c
 +++ b/sys/xvimage/xvimageallocator.c
 @@ -590,46 +590,48 @@ xattach_failed:
@@ -157,7 +153,7 @@ index a6d8432..b82c3c7 100644
 -  if (draw_border) {
 -    gst_xwindow_draw_borders (window, dst_crop);
 +  render_rect = window->render_rect;
-+  if (window->internal && window->have_render_rect) {
++  if (window->internal) {
 +    XMoveResizeWindow (context->disp, window->win,
 +        window->render_rect.x, window->render_rect.y,
 +        window->render_rect.w, window->render_rect.h);

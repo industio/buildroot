@@ -1,7 +1,7 @@
-From 14b341d3d701c6276a317e0df1e837b9002b9e1a Mon Sep 17 00:00:00 2001
+From 310a167ae58d967694b006ec9e0b177db4552bb2 Mon Sep 17 00:00:00 2001
 From: Jeffy Chen <jeffy.chen@rock-chips.com>
 Date: Mon, 3 Oct 2022 21:03:04 +0800
-Subject: [PATCH 059/101] desktop-shell: Fix crash when hotplugging screens
+Subject: [PATCH 59/98] desktop-shell: Fix crash when hotplugging screens
 
 Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
 ---
@@ -98,10 +98,10 @@ index 576d2c4ff..eda84aa88 100644
  				desktop_shell_destroy_surface(shsurf);
  				removed = true;
 diff --git a/libweston/backend-drm/drm.c b/libweston/backend-drm/drm.c
-index 17381ba7a..10d6ae5cb 100644
+index 08da1ff15..21af6e74b 100644
 --- a/libweston/backend-drm/drm.c
 +++ b/libweston/backend-drm/drm.c
-@@ -2753,10 +2753,17 @@ drm_output_destroy(struct weston_output *base)
+@@ -2861,10 +2861,17 @@ drm_output_destroy(struct weston_output *base)
  {
  	struct drm_output *output = to_drm_output(base);
  	struct drm_device *device = output->device;
@@ -120,10 +120,10 @@ index 17381ba7a..10d6ae5cb 100644
  		if (!base->compositor->shutting_down) {
  			/* We are not shutting down, so we can wait for flip
 diff --git a/libweston/compositor.c b/libweston/compositor.c
-index 50d890314..5bb35b0c3 100644
+index 9f7a66157..bf278bb1d 100644
 --- a/libweston/compositor.c
 +++ b/libweston/compositor.c
-@@ -7862,6 +7862,7 @@ static void
+@@ -7870,6 +7870,7 @@ static void
  weston_compositor_remove_output(struct weston_output *output)
  {
  	struct weston_compositor *compositor = output->compositor;
@@ -131,7 +131,7 @@ index 50d890314..5bb35b0c3 100644
  	struct weston_paint_node *pnode, *pntmp;
  	struct weston_view *view;
  	struct weston_head *head;
-@@ -7876,6 +7877,11 @@ weston_compositor_remove_output(struct weston_output *output)
+@@ -7884,6 +7885,11 @@ weston_compositor_remove_output(struct weston_output *output)
  		output->idle_repaint_source = NULL;
  	}
  

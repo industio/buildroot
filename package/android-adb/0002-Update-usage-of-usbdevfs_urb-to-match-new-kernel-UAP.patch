@@ -1,4 +1,4 @@
-From 5e1901bf287e0ae917891386284f3903bf315926 Mon Sep 17 00:00:00 2001
+From abf39042ffc59cc61bcd1cd3a7bf121f636162e7 Mon Sep 17 00:00:00 2001
 From: Anatol Pomozov <anatol.pomozov@gmail.com>
 Date: Mon, 10 Oct 2022 10:47:57 -0700
 Subject: [PATCH 2/3] Update usage of usbdevfs_urb to match new kernel UAPI

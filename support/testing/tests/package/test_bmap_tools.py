@@ -45,6 +45,14 @@ class TestBmapTools(BRTest):
         self.assertRunOk(cmd, timeout=20)
 
 
+class TestPy2BmapTools(TestBmapTools):
+    __test__ = True
+    config = TestBmapTools.config + \
+        """
+        BR2_PACKAGE_PYTHON=y
+        """
+
+
 class TestPy3BmapTools(TestBmapTools):
     __test__ = True
     config = TestBmapTools.config + \

@@ -42,6 +42,10 @@ endef
 
 define inner-qmake-package
 
+$(2)_CONF_ENV			?=
+$(2)_CONF_OPTS			?=
+$(2)_MAKE_ENV			?=
+$(2)_MAKE_OPTS			?=
 $(2)_INSTALL_STAGING_OPTS	?= install
 $(2)_INSTALL_TARGET_OPTS	?= $$($(2)_INSTALL_STAGING_OPTS)
 
@@ -50,6 +54,7 @@ $(2)_DEPENDENCIES 		+= qt5base
 endif
 
 ifeq ($$($(2)_SYNC_QT_HEADERS),YES)
+$(2)_DEPENDENCIES 		+= host-perl
 $(2)_PRE_CONFIGURE_HOOKS        += QT_HEADERS_SYNC_HOOK
 endif
 

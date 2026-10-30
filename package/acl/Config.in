@@ -7,4 +7,4 @@ config BR2_PACKAGE_ACL
 	  directories.
 	  This package also provides libacl.
 
-	  https://savannah.nongnu.org/projects/acl
+	  http://savannah.nongnu.org/projects/acl

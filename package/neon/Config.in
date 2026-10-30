@@ -3,7 +3,7 @@ config BR2_PACKAGE_NEON
 	help
 	  HTTP and WebDAV client library, with a C interface.
 
-	  https://notroj.github.io/neon/
+	  http://www.webdav.org/neon/
 
 if BR2_PACKAGE_NEON
 

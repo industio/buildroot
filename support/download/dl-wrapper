@@ -17,15 +17,15 @@
 # We want to catch any unexpected failure, and exit immediately.
 set -e
 
-export BR_BACKEND_DL_GETOPTS=":hc:d:o:n:N:H:lru:qf:e"
+export BR_BACKEND_DL_GETOPTS=":hc:d:o:n:N:H:ru:qf:e"
 
 main() {
     local OPT OPTARG
-    local backend output large_file recurse quiet rc
-    local -a uris hfiles
+    local backend output hfile recurse quiet rc
+    local -a uris
 
     # Parse our options; anything after '--' is for the backend
-    while getopts ":c:d:D:o:n:N:H:lrf:u:qp:" OPT; do
+    while getopts ":c:d:D:o:n:N:H:rf:u:q" OPT; do
         case "${OPT}" in
         c)  cset="${OPTARG}";;
         d)  dl_dir="${OPTARG}";;
@@ -33,12 +33,10 @@ main() {
         o)  output="${OPTARG}";;
         n)  raw_base_name="${OPTARG}";;
         N)  base_name="${OPTARG}";;
-        H)  hfiles+=( "${OPTARG}" );;
-        l)  large_file="-l";;
+        H)  hfile="${OPTARG}";;
         r)  recurse="-r";;
         f)  filename="${OPTARG}";;
         u)  uris+=( "${OPTARG}" );;
-        p)  post_process="${OPTARG}";;
         q)  quiet="-q";;
         :)  error "option '%s' expects a mandatory argument\n" "${OPTARG}";;
         \?) error "unknown option '%s'\n" "${OPTARG}";;
@@ -70,7 +68,7 @@ main() {
     # - fails at least one of its hashes: force a re-download
     # - there's no hash (but a .hash file): consider it a hard error
     if [ -e "${output}" ]; then
-        if support/download/check-hash ${quiet} "${output}" "${output##*/}" "${hfiles[@]}"; then
+        if support/download/check-hash ${quiet} "${hfile}" "${output}" "${output##*/}"; then
             exit 0
         elif [ ${?} -ne 2 ]; then
             # Do not remove the file, otherwise it might get re-downloaded
@@ -90,7 +88,7 @@ main() {
         backend_urlencode="${uri%%+*}"
         backend="${backend_urlencode%|*}"
         case "${backend}" in
-            git|svn|cvs|bzr|file|scp|hg|sftp) ;;
+            git|svn|cvs|bzr|file|scp|hg) ;;
             *) backend="wget" ;;
         esac
         uri=${uri#*+}
@@ -129,7 +127,7 @@ main() {
                 -f "${filename}" \
                 -u "${uri}" \
                 -o "${tmpf}" \
-                ${quiet} ${large_file} ${recurse} -- "${@}"
+                ${quiet} ${recurse} -- "${@}"
         then
             # cd back to keep path coherence
             cd "${OLDPWD}"
@@ -137,24 +135,12 @@ main() {
             continue
         fi
 
-        if [ -n "${post_process}" ] ; then
-            if ! "${OLDPWD}/support/download/${post_process}-post-process" \
-                    -o "${tmpf}" \
-                    -n "${raw_base_name}"
-            then
-                # cd back to keep path coherence
-                cd "${OLDPWD}"
-                rm -rf "${tmpd}"
-                continue
-            fi
-        fi
-
         # cd back to free the temp-dir, so we can remove it later
         cd "${OLDPWD}"
 
         # Check if the downloaded file is sane, and matches the stored hashes
         # for that file
-        if support/download/check-hash ${quiet} "${tmpf}" "${output##*/}" "${hfiles[@]}"; then
+        if support/download/check-hash ${quiet} "${hfile}" "${tmpf}" "${output##*/}"; then
             rc=0
         else
             if [ ${?} -ne 3 ]; then

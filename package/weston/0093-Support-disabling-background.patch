@@ -1,7 +1,7 @@
-From 9d72ebaf3c90d04548d33a35ef19f7e17c4d3646 Mon Sep 17 00:00:00 2001
+From b63c0350e68ce58e38872fe7056f147da2127ff2 Mon Sep 17 00:00:00 2001
 From: Jeffy Chen <jeffy.chen@rock-chips.com>
 Date: Thu, 8 Aug 2024 08:51:02 +0800
-Subject: [PATCH 093/100] Support disabling background
+Subject: [PATCH 93/98] Support disabling background
 
 Set env WESTON_NO_BACKGROUND=1 to disable it.
 

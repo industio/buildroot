@@ -16,5 +16,6 @@
 #include "tools/common.config"
 #include "tools/test.config"
 #include "network/chromium.config"
+#include "powermanager.config"
 #include "gui/weston.config"
 # BR2_PACKAGE_ROCKCHIP_RGA is not set

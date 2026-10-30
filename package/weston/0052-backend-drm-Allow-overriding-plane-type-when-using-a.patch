@@ -1,7 +1,7 @@
-From 57ef8553763ab57faaeda548ac783a2344f968d0 Mon Sep 17 00:00:00 2001
+From 579321f696fff21738688fc48c2a8332b3aa0ac8 Mon Sep 17 00:00:00 2001
 From: Jeffy Chen <jeffy.chen@rock-chips.com>
 Date: Mon, 7 Mar 2022 17:20:59 +0800
-Subject: [PATCH 052/101] backend-drm: Allow overriding plane type when using
+Subject: [PATCH 52/95] backend-drm: Allow overriding plane type when using
  atomic
 
 Set env DRM_PLANE_TYPE_<plane id> to primary|overlay|cursor.
@@ -14,10 +14,10 @@ Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
  3 files changed, 34 insertions(+), 4 deletions(-)
 
 diff --git a/libweston/backend-drm/drm-internal.h b/libweston/backend-drm/drm-internal.h
-index 455ddad4b..4773f02fd 100644
+index f9ccbda..31bdc99 100644
 --- a/libweston/backend-drm/drm-internal.h
 +++ b/libweston/backend-drm/drm-internal.h
-@@ -802,6 +802,9 @@ drm_plane_populate_formats(struct drm_plane *plane, const drmModePlane *kplane,
+@@ -803,6 +803,9 @@ drm_plane_populate_formats(struct drm_plane *plane, const drmModePlane *kplane,
  void
  drm_property_info_free(struct drm_property_info *info, int num_props);
  
@@ -28,10 +28,10 @@ index 455ddad4b..4773f02fd 100644
  extern const struct drm_property_info plane_props[];
  extern struct drm_property_enum_info dpms_state_enums[];
 diff --git a/libweston/backend-drm/drm.c b/libweston/backend-drm/drm.c
-index df89f3c8a..96e00c8bb 100644
+index 4a350e7..4491a0f 100644
 --- a/libweston/backend-drm/drm.c
 +++ b/libweston/backend-drm/drm.c
-@@ -1437,10 +1437,8 @@ drm_plane_create(struct drm_device *device, const drmModePlane *kplane)
+@@ -1538,10 +1538,8 @@ drm_plane_create(struct drm_device *device, const drmModePlane *kplane)
  
  	drm_property_info_populate(device, plane_props, plane->props,
  				   WDRM_PLANE__COUNT, props);
@@ -45,7 +45,7 @@ index df89f3c8a..96e00c8bb 100644
  	plane->can_scale =
  		drm_property_has_feature(plane->props,
 diff --git a/libweston/backend-drm/kms.c b/libweston/backend-drm/kms.c
-index bcb9a38d0..d3a8a3ced 100644
+index bcb9a38..d3a8a3c 100644
 --- a/libweston/backend-drm/kms.c
 +++ b/libweston/backend-drm/kms.c
 @@ -605,6 +605,35 @@ drm_property_info_free(struct drm_property_info *info, int num_props)

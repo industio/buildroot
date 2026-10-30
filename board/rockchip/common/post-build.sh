@@ -30,7 +30,7 @@ POST_SCRIPT="../device/rockchip/common/post-build.sh"
 # Filter out host pathes
 export PATH="$(echo $PATH | xargs -d':' -n 1 | grep -v "^$O" | paste -sd':')"
 
-$POST_SCRIPT "$(realpath "$TARGET_DIR")" 2>&1 | \
+$POST_SCRIPT "$(realpath "$TARGET_DIR")" "$(basename "$BR2_DEFCONFIG")" 2>&1 | \
 	while read line; do
 		if echo "$line" | \
 			grep -iqE "building|running|handling|installing"; then

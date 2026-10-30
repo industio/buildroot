@@ -1,7 +1,7 @@
-From 53be6e8d87113635e896377550206708b5a066af Mon Sep 17 00:00:00 2001
+From 980eb095a2efcd4ad1892b4482fec2e193e17381 Mon Sep 17 00:00:00 2001
 From: Jeffy Chen <jeffy.chen@rock-chips.com>
 Date: Wed, 7 Apr 2021 08:25:57 +0800
-Subject: [PATCH 043/100] config-parser: Support loading multiple configs
+Subject: [PATCH 43/95] config-parser: Support loading multiple configs
 
 Try loading .ini configs under "<config>.d/".
 
@@ -17,7 +17,7 @@ Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
  2 files changed, 128 insertions(+), 27 deletions(-)
 
 diff --git a/frontend/main.c b/frontend/main.c
-index 587cf715b..a6efeb2cf 100644
+index 587cf71..a6efeb2 100644
 --- a/frontend/main.c
 +++ b/frontend/main.c
 @@ -1280,8 +1280,11 @@ load_configuration(struct weston_config **config, int32_t noconfig,
@@ -34,7 +34,7 @@ index 587cf715b..a6efeb2cf 100644
  	if (*config) {
  		full_path = weston_config_get_full_path(*config);
 diff --git a/shared/config-parser.c b/shared/config-parser.c
-index 749158df7..6932a7728 100644
+index 749158d..6932a77 100644
 --- a/shared/config-parser.c
 +++ b/shared/config-parser.c
 @@ -31,6 +31,7 @@

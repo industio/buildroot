@@ -2,6 +2,7 @@ config BR2_PACKAGE_RKPARTYBOX
 	bool "RKPARTYBOX demo"
 	depends on BR2_aarch64
 	depends on BR2_PACKAGE_HAS_UDEV
+	depends on BR2_PACKAGE_WPA_SUPPLICANT
 	help
 	  rkpartybox demo
 
@@ -16,8 +17,6 @@ config BR2_PACKAGE_PBOX_LCD_DISPLAY
 	depends on BR2_PACKAGE_RKPARTYBOX
 	depends on BR2_PACKAGE_LVGL
 	depends on BR2_PACKAGE_LV_DRIVERS
-	depends on BR2_PACKAGE_WPA_SUPPLICANT
-	select BR2_PACKAGE_LIBEVDEV
 	default y
 	help
 	  partybox lcd display

@@ -597,7 +597,6 @@ config BR2_ARM_SOFT_FLOAT
 
 config BR2_ARM_FPU_AUTO
 	bool "Auto"
-	depends on BR2_ARCH_NEEDS_GCC_AT_LEAST_8
 	help
 	  This option allows to use GCC's default floating point unit.
 
@@ -796,9 +795,6 @@ choice
 config BR2_ARM64_PAGE_SIZE_4K
 	bool "4KB"
 
-config BR2_ARM64_PAGE_SIZE_16K
-	bool "16KB"
-
 config BR2_ARM64_PAGE_SIZE_64K
 	bool "64KB"
 
@@ -807,7 +803,6 @@ endchoice
 config BR2_ARM64_PAGE_SIZE
 	string
 	default "4K" if BR2_ARM64_PAGE_SIZE_4K
-	default "16K" if BR2_ARM64_PAGE_SIZE_16K
 	default "64K" if BR2_ARM64_PAGE_SIZE_64K
 
 config BR2_ARCH

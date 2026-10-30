@@ -12,4 +12,3 @@ PYTHON_SERIAL_LICENSE_FILES = LICENSE.txt
 PYTHON_SERIAL_SETUP_TYPE = setuptools
 
 $(eval $(python-package))
-$(eval $(host-python-package))

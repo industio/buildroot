@@ -1,7 +1,7 @@
-From 1e4bd42d3be4495f8c9ee6237cadda66518621a7 Mon Sep 17 00:00:00 2001
+From 9a434579cec0ade11e92e01b78736a81d4bd6da8 Mon Sep 17 00:00:00 2001
 From: Jeffy Chen <jeffy.chen@rock-chips.com>
 Date: Fri, 3 Jul 2020 10:20:40 +0800
-Subject: [PATCH 030/100] Support holding display for the first app
+Subject: [PATCH 30/97] Support holding display for the first app
 
 Use '-w' or '--warm-up' to enable it.
 
@@ -69,7 +69,7 @@ index 5342af89d..ba961a861 100644
  
  struct weston_solid_buffer_values {
 diff --git a/libweston/compositor.c b/libweston/compositor.c
-index 5189f6ff9..8d69fa160 100644
+index 463e2118b..650e51b0b 100644
 --- a/libweston/compositor.c
 +++ b/libweston/compositor.c
 @@ -3705,7 +3705,14 @@ weston_compositor_build_view_list(struct weston_compositor *compositor)

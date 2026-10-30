@@ -22,11 +22,6 @@ export WESTON_DRM_MIN_BUFFERS=2
 # Allow using drm modifier, e.g. ARM AFBC
 # export WESTON_ALLOW_GBM_MODIFIERS=1
 
-# Enable extra bindings
-# export WESTON_MOD_BINDING=1
-# export WESTON_KEY_BINDING=1
-# export WESTON_DEBUG_BINDING=1
-
 # Enable black background for fullscreen views
 # export WESTON_FULLSCREEN_BLACK_BACKGROUND=1
 
@@ -78,10 +73,6 @@ export WESTON_FREEZE_DISPLAY=/tmp/.freeze_weston
 
 # Try to pin views to the assigned output
 # export WESTON_OUTPUT_PIN=1
-
-# Default window position
-# <x>,<y>|center|left-top|left-bottom|right-top|right-bottom
-# export WESTON_DEFAULT_POSITION=center
 
 # Set dynamic config file path
 # export WESTON_DRM_CONFIG=/tmp/.weston_drm.conf

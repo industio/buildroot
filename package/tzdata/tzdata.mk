@@ -4,10 +4,9 @@
 #
 ################################################################################
 
-TZDATA_VERSION = 2023c
+TZDATA_VERSION = 2021a
 TZDATA_SOURCE = tzdata$(TZDATA_VERSION).tar.gz
 TZDATA_SITE = https://www.iana.org/time-zones/repository/releases
-TZDATA_SELINUX_MODULES = tzdata
 TZDATA_STRIP_COMPONENTS = 0
 TZDATA_DEPENDENCIES = host-tzdata
 HOST_TZDATA_DEPENDENCIES = host-zic
@@ -60,7 +59,7 @@ endef
 
 define HOST_TZDATA_INSTALL_CMDS
 	$(INSTALL) -d -m 0755 $(HOST_DIR)/share/zoneinfo
-	cp -a $(@D)/_output/* $(@D)/*.tab $(@D)/leap-seconds.list $(HOST_DIR)/share/zoneinfo
+	cp -a $(@D)/_output/* $(@D)/*.tab $(HOST_DIR)/share/zoneinfo
 endef
 
 $(eval $(generic-package))

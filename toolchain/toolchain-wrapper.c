@@ -298,7 +298,7 @@ int main(int argc, char **argv)
 		return 2;
 	}
 
-	/* clang/clang++ doesn't like linker input when no linking */
+	/* clang doesn't like linker input when no linking */
 	for (i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-c") || !strcmp(argv[i], "-E") ||
 		    !strcmp(argv[i], "-s") ||

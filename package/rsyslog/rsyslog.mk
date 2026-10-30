@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-RSYSLOG_VERSION = 8.2312.0
+RSYSLOG_VERSION = 8.2010.0
 RSYSLOG_SITE = http://rsyslog.com/files/download/rsyslog
 RSYSLOG_LICENSE = GPL-3.0, LGPL-3.0, Apache-2.0
 RSYSLOG_LICENSE_FILES = COPYING COPYING.LESSER COPYING.ASL20
@@ -28,42 +28,20 @@ endif
 RSYSLOG_CONF_OPTS = --disable-generate-man-pages \
 	$(foreach x,$(call qstrip,$(RSYSLOG_PLUGINS)),--enable-$(x))
 
-# Disable items requiring lognorm
-RSYSLOG_CONF_OPTS += \
-	--disable-mmkubernetes \
-	--disable-mmnormalize
-
-ifeq ($(BR2_PACKAGE_LIBCURL),y)
-RSYSLOG_DEPENDENCIES += libcurl
-RSYSLOG_CONF_OPTS += \
-	--enable-clickhouse \
-	--enable-elasticsearch \
-	--enable-fmhttp \
-	--enable-imdocker \
-	--enable-omhttp \
-	--enable-omhttpfs
-else
-RSYSLOG_CONF_OPTS += \
+# Disable items requiring libcurl
+RSYSLOG_CONF_OPTS += --disable-elasticsearch \
 	--disable-clickhouse \
-	--disable-elasticsearch \
+	--disable-omhttp \
 	--disable-fmhttp \
 	--disable-imdocker \
-	--disable-omhttp \
-	--disable-omhttpfs
-endif
+	--disable-omhttpfs \
+	--disable-mmkubernetes
 
 ifeq ($(BR2_PACKAGE_CIVETWEB_LIB),y)
-RSYSLOG_DEPENDENCIES += apr-util civetweb
+RSYSLOG_DEPENDENCIES += civetweb
 RSYSLOG_CONF_OPTS += --enable-imhttp
 else
 RSYSLOG_CONF_OPTS += --disable-imhttp
-endif
-
-ifeq ($(BR2_PACKAGE_CZMQ),y)
-RSYSLOG_DEPENDENCIES += czmq
-RSYSLOG_CONF_OPTS += --enable-imczmq --enable-omczmq
-else
-RSYSLOG_CONF_OPTS += --disable-imczmq --disable-omczmq
 endif
 
 ifeq ($(BR2_PACKAGE_GNUTLS),y)
@@ -73,11 +51,8 @@ else
 RSYSLOG_CONF_OPTS += --disable-gnutls
 endif
 
-ifeq ($(BR2_PACKAGE_HIREDIS),y)
-RSYSLOG_DEPENDENCIES += hiredis
-RSYSLOG_CONF_OPTS += --enable-omhiredis
-else
-RSYSLOG_CONF_OPTS += --disable-omhiredis
+ifeq ($(BR2_PACKAGE_LIBEE),y)
+RSYSLOG_DEPENDENCIES += libee
 endif
 
 ifeq ($(BR2_PACKAGE_LIBGCRYPT),y)
@@ -88,13 +63,6 @@ else
 RSYSLOG_CONF_OPTS += --disable-libgcrypt
 endif
 
-ifeq ($(BR2_PACKAGE_LIBMAXMINDDB),y)
-RSYSLOG_DEPENDENCIES += libmaxminddb
-RSYSLOG_CONF_OPTS += --enable-mmdblookup
-else
-RSYSLOG_CONF_OPTS += --disable-mmdblookup
-endif
-
 ifeq ($(BR2_PACKAGE_LIBPCAP),y)
 RSYSLOG_DEPENDENCIES += libpcap
 RSYSLOG_CONF_OPTS += --enable-impcap
@@ -102,8 +70,8 @@ else
 RSYSLOG_CONF_OPTS += --disable-impcap
 endif
 
-ifeq ($(BR2_PACKAGE_MARIADB),y)
-RSYSLOG_DEPENDENCIES += mariadb
+ifeq ($(BR2_PACKAGE_MYSQL),y)
+RSYSLOG_DEPENDENCIES += mysql
 RSYSLOG_CONF_OPTS += --enable-mysql
 RSYSLOG_CONF_ENV += ac_cv_prog_MYSQL_CONFIG=$(STAGING_DIR)/usr/bin/mysql_config
 else
@@ -116,20 +84,6 @@ RSYSLOG_CONF_OPTS += --enable-pgsql
 RSYSLOG_CONF_ENV += ac_cv_prog_PG_CONFIG=$(STAGING_DIR)/usr/bin/pg_config
 else
 RSYSLOG_CONF_OPTS += --disable-pgsql
-endif
-
-ifeq ($(BR2_PACKAGE_QPID_PROTON),y)
-RSYSLOG_DEPENDENCIES += qpid-proton
-RSYSLOG_CONF_OPTS += --enable-omamqp1
-else
-RSYSLOG_CONF_OPTS += --disable-omamqp1
-endif
-
-ifeq ($(BR2_PACKAGE_RABBITMQ_C),y)
-RSYSLOG_DEPENDENCIES += rabbitmq-c
-RSYSLOG_CONF_OPTS += --enable-omrabbitmq
-else
-RSYSLOG_CONF_OPTS += --disable-omrabbitmq
 endif
 
 ifeq ($(BR2_PACKAGE_UTIL_LINUX_LIBUUID),y)
@@ -151,15 +105,8 @@ RSYSLOG_CONF_OPTS += \
 	--disable-omjournal
 endif
 
-ifeq ($(BR2_PACKAGE_LIBDBI_DRIVERS),y)
-RSYSLOG_CONF_OPTS += --enable-libdbi
-RSYSLOG_DEPENDENCIES += libdbi-drivers
-else
-RSYSLOG_CONF_OPTS += --disable-libdbi
-endif
-
 define RSYSLOG_INSTALL_INIT_SYSTEMD
-	$(INSTALL) -m 0644 -D package/rsyslog/rsyslog.service \
+	$(INSTALL) -m 0755 -D package/rsyslog/rsyslog.service \
 		$(TARGET_DIR)/usr/lib/systemd/system/rsyslog.service
 endef
 
