@@ -5,26 +5,25 @@ case "$1" in
 
 		#echo 1 > /sys/class/rfkill/rfkill1/state
 
-#		if [ ! -d "/userdata/" ];then
-#			echo "userdata is not mounted!!!"
-#			exit 1
-#		fi
+		if [ ! -d "/userdata/" ];then
+			echo "userdata is not mounted!!!"
+			exit 1
+		fi
 
-#		mkdir -p /userdata/cfg
-#		mkdir -p /userdata/bin
+		mkdir -p /userdata/cfg
+		mkdir -p /userdata/bin
 
-#		if [ ! -f "/userdata/cfg/wpa_supplicant.conf" ];then
-#			echo "wpa_supplicant.conf init"
-#			cp /etc/wpa_supplicant.conf /userdata/cfg/
-#			sync
-#		fi
+		if [ ! -f "/userdata/cfg/wpa_supplicant.conf" ];then
+			echo "wpa_supplicant.conf init"
+			cp /etc/wpa_supplicant.conf /userdata/cfg/
+			sync
+		fi
 
-#		if [ ! -f "/userdata/bin/dnsmasq.conf" ];then
-#			echo "wpa_supplicant.conf init"
-#			cp /etc/dnsmasq.conf /userdata/bin/
-#			sync
-#		fi
-
+		if [ ! -f "/userdata/bin/dnsmasq.conf" ];then
+			echo "wpa_supplicant.conf init"
+			cp /etc/dnsmasq.conf /userdata/bin/
+			sync
+		fi
 		#insmod *.ko
 		/usr/sbin/rkwifi-bt.sh
 		;;
